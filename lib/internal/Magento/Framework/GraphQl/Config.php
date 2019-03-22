@@ -59,24 +59,11 @@ class Config implements ConfigInterface
             );
         }
 
-        $fieldsInQuery = $this->queryFields->getFieldsUsedInQuery();
-        if (isset($data['fields'])) {
-            if (!empty($fieldsInQuery)) {
-                foreach (array_keys($data['fields']) as $fieldName) {
-                    if (!isset($fieldsInQuery[$fieldName])) {
-                        unset($data['fields'][$fieldName]);
-                    }
-                }
-            }
-
-            ksort($data['fields']);
-        }
-
         return $this->configElementFactory->createFromConfigData($data);
     }
 
     /**
-     * @inheritdoc
+     * @inheritdocadd
      */
     public function getDeclaredTypes() : array
     {
