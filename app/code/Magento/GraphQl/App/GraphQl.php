@@ -12,6 +12,8 @@ use Magento\Framework\App\Console\Response as CliResponse;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\GraphQl\Schema\SchemaGeneratorInterface;
 use Magento\GraphQl\Controller\GraphQl\Proxy as Conttroller;
+use Magento\MessageQueue\Api\PoisonPillCompareInterface;
+use Magento\MessageQueue\Api\PoisonPillReadInterface;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\Http\Server;
@@ -52,6 +54,15 @@ class GraphQl implements AppInterface
      * @var CliResponse
      */
     private $cliResponse;
+    /**
+     * @var PoisonPillReadInterface
+     */
+    private $poisonPillRead;
+    /**
+     * @var PoisonPillCompareInterface
+     */
+    private $poisonPillCompare;
+    private $poisonPillVersion;
 
     /**
      * GraphQl constructor.
@@ -61,6 +72,8 @@ class GraphQl implements AppInterface
      * @param SchemaGeneratorInterface $schemaGenerator
      * @param ConfigLoaderInterface $configLoader
      * @param CliResponse $cliResponse
+     * @param PoisonPillReadInterface $poisonPillRead
+     * @param PoisonPillCompareInterface $poisonPillCompare
      */
     public function __construct(
         ObjectManagerInterface $objectManager,
@@ -68,7 +81,9 @@ class GraphQl implements AppInterface
         Conttroller $graphQl,
         SchemaGeneratorInterface $schemaGenerator,
         ConfigLoaderInterface $configLoader,
-        CliResponse $cliResponse
+        CliResponse $cliResponse,
+        PoisonPillReadInterface $poisonPillRead,
+        PoisonPillCompareInterface $poisonPillCompare
     )
     {
         $this->graphQl = $graphQl;
@@ -77,6 +92,8 @@ class GraphQl implements AppInterface
         $this->appState = $appState;
         $this->configLoader = $configLoader;
         $this->cliResponse = $cliResponse;
+        $this->poisonPillRead = $poisonPillRead;
+        $this->poisonPillCompare = $poisonPillCompare;
     }
 
     private function setState():void
@@ -112,12 +129,16 @@ class GraphQl implements AppInterface
             'max_request' => 10000,
             'buffer_output_size' => 32 * 1024 * 1024,
         ]);
+        $this->poisonPillVersion = $this->poisonPillRead->getLatestVersion();
         $http->on('request', [$this, 'request']);
         $http->start();
     }
 
     public function request(Request $request, Response $response)
     {
+        if (false === $this->poisonPillCompare->isLatestVersion($this->poisonPillVersion)) {
+            exit(0);
+        }
         $httpRequest = $this->makeMagentoRequest($request);
         /** @var \Magento\Framework\Webapi\Response $result */
         $result = $this->graphQl->dispatch($httpRequest);
