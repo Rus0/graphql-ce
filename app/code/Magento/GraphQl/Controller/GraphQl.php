@@ -106,9 +106,11 @@ class GraphQl implements FrontControllerInterface
     {
         $statusCode = 200;
         try {
+            //Magento\Framework\App\State
             /** @var Http $request */
             $this->requestProcessor->processHeaders($request);
-            $data = $this->jsonSerializer->unserialize($request->getContent());
+            $data = $request->getContent();
+            $data = $this->jsonSerializer->unserialize($data);
 
             $query = isset($data['query']) ? $data['query'] : '';
             $variables = isset($data['variables']) ? $data['variables'] : null;

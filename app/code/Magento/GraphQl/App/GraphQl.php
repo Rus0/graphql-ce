@@ -11,7 +11,7 @@ use Magento\Framework\App\Area;
 use Magento\Framework\App\Console\Response as CliResponse;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\GraphQl\Schema\SchemaGeneratorInterface;
-use Magento\GraphQl\Controller\GraphQl as Conttroller;
+use Magento\GraphQl\Controller\GraphQl\Proxy as Conttroller;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\Http\Server;
@@ -109,8 +109,8 @@ class GraphQl implements AppInterface
         );
         $http->set([
             'worker_num' => 8,
-            'max_request' => 100,
-            'buffer_output_size' => 32 * 1024 *1024,
+            'max_request' => 10000,
+            'buffer_output_size' => 32 * 1024 * 1024,
         ]);
         $http->on('request', [$this, 'request']);
         $http->start();
