@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Magento\CatalogGraphQl\Model\Resolver\Products\DataProvider;
 
 use GraphQL\Language\AST\FieldNode;
+use Magento\CatalogGraphQl\Model\AttributesJoiner;
 use Magento\CatalogGraphQl\Model\Category\DepthCalculator;
 use Magento\CatalogGraphQl\Model\Category\LevelCalculator;
 use Magento\Framework\EntityManager\MetadataPool;
@@ -15,7 +16,7 @@ use Magento\Framework\GraphQl\Schema\Type\ResolveInfo;
 use Magento\Catalog\Api\Data\CategoryInterface;
 use Magento\Catalog\Model\ResourceModel\Category\Collection;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
-use Magento\CatalogGraphQl\Model\AttributesJoiner;
+use Magento\CatalogGraphQl\Model\AttributesJoinerFactory;
 use Magento\Catalog\Model\Category;
 
 /**
@@ -34,9 +35,9 @@ class CategoryTree
     private $collectionFactory;
 
     /**
-     * @var AttributesJoiner
+     * @var AttributesJoinerFactory
      */
-    private $attributesJoiner;
+    private $attributesJoinerFactory;
 
     /**
      * @var DepthCalculator
@@ -55,20 +56,20 @@ class CategoryTree
 
     /**
      * @param CollectionFactory $collectionFactory
-     * @param AttributesJoiner $attributesJoiner
+     * @param AttributesJoinerFactory $attributesJoinerFactory
      * @param DepthCalculator $depthCalculator
      * @param LevelCalculator $levelCalculator
      * @param MetadataPool $metadata
      */
     public function __construct(
         CollectionFactory $collectionFactory,
-        AttributesJoiner $attributesJoiner,
+        AttributesJoinerFactory $attributesJoinerFactory,
         DepthCalculator $depthCalculator,
         LevelCalculator $levelCalculator,
         MetadataPool $metadata
     ) {
         $this->collectionFactory = $collectionFactory;
-        $this->attributesJoiner = $attributesJoiner;
+        $this->attributesJoinerFactory = $attributesJoinerFactory;
         $this->depthCalculator = $depthCalculator;
         $this->levelCalculator = $levelCalculator;
         $this->metadata = $metadata;
@@ -84,8 +85,9 @@ class CategoryTree
     public function getTree(ResolveInfo $resolveInfo, int $rootCategoryId): \Iterator
     {
         $categoryQuery = $resolveInfo->fieldNodes[0];
+        $attributesJoiner = $this->attributesJoinerFactory->create();
         $collection = $this->collectionFactory->create();
-        $this->joinAttributesRecursively($collection, $categoryQuery);
+        $this->joinAttributesRecursively($collection, $attributesJoiner, $categoryQuery);
         $depth = $this->depthCalculator->calculate($categoryQuery);
         $level = $this->levelCalculator->calculate($rootCategoryId);
 
@@ -123,17 +125,18 @@ class CategoryTree
      * Join attributes recursively
      *
      * @param Collection $collection
+     * @param AttributesJoiner $attributesJoiner
      * @param FieldNode $fieldNode
      * @return void
      */
-    private function joinAttributesRecursively(Collection $collection, FieldNode $fieldNode) : void
+    private function joinAttributesRecursively(Collection $collection, AttributesJoiner $attributesJoiner, FieldNode $fieldNode) : void
     {
         if (!isset($fieldNode->selectionSet->selections)) {
             return;
         }
 
         $subSelection = $fieldNode->selectionSet->selections;
-        $this->attributesJoiner->join($fieldNode, $collection);
+        $attributesJoiner->join($fieldNode, $collection);
 
         /** @var FieldNode $node */
         foreach ($subSelection as $node) {
@@ -141,7 +144,7 @@ class CategoryTree
                 continue;
             }
 
-            $this->joinAttributesRecursively($collection, $node);
+            $this->joinAttributesRecursively($collection, $attributesJoiner, $node);
         }
     }
 }
