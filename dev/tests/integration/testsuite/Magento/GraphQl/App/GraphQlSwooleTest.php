@@ -35,7 +35,7 @@ class GraphQlSwooleTest extends \PHPUnit\Framework\TestCase
             sleep(5);
         } while (
             self::$process->isRunning()
-            && (!self::$process->getOutput() || self::$process->getOutput() !== 'GraphQl is running')
+            && (!self::$process->getOutput() || self::$process->getOutput() !== 'GraphQl is running' . PHP_EOL)
         );
         parent::setUpBeforeClass();
     }

@@ -148,7 +148,7 @@ class GraphQl implements AppInterface
         ]);
         $this->poisonPillVersion = $this->poisonPillRead->getLatestVersion();
         $this->http->on('request', [$this, 'request']);
-        echo 'GraphQl is running';
+        echo 'GraphQl is running' . PHP_EOL;
         $this->http->start();
     }
 
