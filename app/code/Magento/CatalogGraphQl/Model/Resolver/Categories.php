@@ -7,13 +7,11 @@ declare(strict_types=1);
 
 namespace Magento\CatalogGraphQl\Model\Resolver;
 
+use Magento\CatalogGraphQl\Model\AttributesJoinerFactory;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\GraphQl\Schema\Type\ResolveInfo;
 use Magento\Catalog\Api\Data\CategoryInterface;
-use Magento\Catalog\Model\ResourceModel\Category\Collection;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
-use Magento\CatalogGraphQl\Model\AttributesJoiner;
-use Magento\CatalogGraphQl\Model\Resolver\Products\DataProvider\CustomAttributesFlattener;
 use Magento\Framework\GraphQl\Config\Element\Field;
 use Magento\Framework\GraphQl\Query\ResolverInterface;
 use Magento\Framework\GraphQl\Query\Resolver\ValueFactory;
@@ -25,9 +23,9 @@ use Magento\CatalogGraphQl\Model\Category\Hydrator as CategoryHydrator;
 class Categories implements ResolverInterface
 {
     /**
-     * @var Collection
+     * @var CollectionFactory
      */
-    private $collection;
+    private $collectionFactory;
 
     /**
      * Accumulated category ids
@@ -37,14 +35,9 @@ class Categories implements ResolverInterface
     private $categoryIds = [];
 
     /**
-     * @var AttributesJoiner
+     * @var AttributesJoinerFactory
      */
-    private $attributesJoiner;
-
-    /**
-     * @var CustomAttributesFlattener
-     */
-    private $customAttributesFlattener;
+    private $attributesJoinerFactory;
 
     /**
      * @var ValueFactory
@@ -58,21 +51,18 @@ class Categories implements ResolverInterface
 
     /**
      * @param CollectionFactory $collectionFactory
-     * @param AttributesJoiner $attributesJoiner
-     * @param CustomAttributesFlattener $customAttributesFlattener
+     * @param AttributesJoinerFactory $attributesJoinerFactory
      * @param ValueFactory $valueFactory
      * @param CategoryHydrator $categoryHydrator
      */
     public function __construct(
         CollectionFactory $collectionFactory,
-        AttributesJoiner $attributesJoiner,
-        CustomAttributesFlattener $customAttributesFlattener,
+        AttributesJoinerFactory $attributesJoinerFactory,
         ValueFactory $valueFactory,
         CategoryHydrator $categoryHydrator
     ) {
-        $this->collection = $collectionFactory->create();
-        $this->attributesJoiner = $attributesJoiner;
-        $this->customAttributesFlattener = $customAttributesFlattener;
+        $this->collectionFactory = $collectionFactory;
+        $this->attributesJoinerFactory = $attributesJoinerFactory;
         $this->valueFactory = $valueFactory;
         $this->categoryHydrator = $categoryHydrator;
     }
@@ -99,18 +89,17 @@ class Categories implements ResolverInterface
             if (empty($that->categoryIds)) {
                 return [];
             }
-
-            if (!$this->collection->isLoaded()) {
-                $that->attributesJoiner->join($info->fieldNodes[0], $this->collection);
-                $this->collection->addIdFilter($this->categoryIds);
-            }
+            $collection = $this->collectionFactory->create();
+            $attributesJoiner = $that->attributesJoinerFactory->create();
+            $attributesJoiner->join($info->fieldNodes[0], $collection);
+            $collection->addIdFilter($this->categoryIds);
             /** @var CategoryInterface | \Magento\Catalog\Model\Category $item */
-            foreach ($this->collection as $item) {
+            foreach ($collection as $item) {
                 if (in_array($item->getId(), $categoryIds)) {
                     // Try to extract all requested fields from the loaded collection data
                     $categories[$item->getId()] = $this->categoryHydrator->hydrateCategory($item, true);
                     $categories[$item->getId()]['model'] = $item;
-                    $requestedFields = $that->attributesJoiner->getQueryFields($info->fieldNodes[0]);
+                    $requestedFields = $attributesJoiner->getQueryFields($info->fieldNodes[0]);
                     $extractedFields = array_keys($categories[$item->getId()]);
                     $foundFields = array_intersect($requestedFields, $extractedFields);
                     if (count($requestedFields) === count($foundFields)) {
