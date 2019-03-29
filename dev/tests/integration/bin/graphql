@@ -8,11 +8,12 @@
  */
 
 require __DIR__ . '/../framework/bootstrap.php';
-$testBootstrap = \Magento\TestFramework\Helper\Bootstrap::getInstance();
-$p = $testBootstrap->getAppInitParams();
-$d = $testBootstrap->getAppTempDir();
-$bootstrap = \Magento\Framework\App\Bootstrap::create($d, $p);
+$testInitParams = \Magento\TestFramework\Helper\Bootstrap::getInstance()->getAppInitParams();
+$bootstrap = \Magento\Framework\App\Bootstrap::create(BP, $testInitParams);
 /** @var \Magento\GraphQl\App\GraphQl $app */
-$app = $bootstrap->createApplication(\Magento\GraphQl\App\GraphQl::class, ['data' => ['baseDir' => $d]]);
+$app = $bootstrap->createApplication(
+        \Magento\GraphQl\App\GraphQl::class,
+        ['data' => ['initParams' => $testInitParams]]
+);
 $bootstrap->run($app);
 $app->listen();

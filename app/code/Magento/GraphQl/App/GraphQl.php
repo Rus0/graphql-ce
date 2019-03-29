@@ -12,7 +12,7 @@ use Magento\Framework\App\Console\Response as CliResponse;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\GraphQl\Schema\SchemaGeneratorInterface;
 use Magento\Framework as Framework;
-use Magento\GraphQl\Controller\GraphQl\Proxy as Conttroller;
+use Magento\GraphQl\Controller\GraphQl as Conttroller;
 use Magento\MessageQueue\Api\PoisonPillCompareInterface;
 use Magento\MessageQueue\Api\PoisonPillReadInterface;
 use Swoole\Http\Request;
@@ -20,7 +20,6 @@ use Swoole\Http\Response;
 use Swoole\Http\Server;
 use Magento\Framework\AppInterface;
 use Magento\Framework\App;
-use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\App\State;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
 
@@ -50,6 +49,7 @@ class GraphQl implements AppInterface
      * @var CliResponse
      */
     private $cliResponse;
+
     /**
      * @var PoisonPillReadInterface
      */
@@ -58,6 +58,10 @@ class GraphQl implements AppInterface
      * @var PoisonPillCompareInterface
      */
     private $poisonPillCompare;
+
+    /**
+     * @var int
+     */
     private $poisonPillVersion;
 
     /**
@@ -71,7 +75,13 @@ class GraphQl implements AppInterface
     private $data;
 
     /**
+     * @var Framework\ObjectManagerInterface
+     */
+    private $objectManager;
+
+    /**
      * GraphQl constructor.
+     * @param Framework\ObjectManagerInterface $objectManager
      * @param State $appState
      * @param Conttroller $graphQl
      * @param SchemaGeneratorInterface $schemaGenerator
@@ -82,6 +92,7 @@ class GraphQl implements AppInterface
      * @param array $data
      */
     public function __construct(
+        Framework\ObjectManagerInterface $objectManager,
         State $appState,
         Conttroller $graphQl,
         SchemaGeneratorInterface $schemaGenerator,
@@ -92,6 +103,7 @@ class GraphQl implements AppInterface
         $data = []
     )
     {
+        $this->objectManager = $objectManager;
         $this->graphQl = $graphQl;
         $this->schemaGenerator = $schemaGenerator;
         $this->appState = $appState;
@@ -113,14 +125,14 @@ class GraphQl implements AppInterface
     private function init():void
     {
         $this->appState->setAreaCode(Area::AREA_GRAPHQL);
-        Framework\App\ObjectManager::getInstance()->configure($this->configLoader->load(Area::AREA_GRAPHQL));
+        $this->objectManager->configure($this->configLoader->load(Area::AREA_GRAPHQL));
         $this->schemaGenerator->generate();
     }
 
     public function listen():void
     {
         //TODO: need extend config
-        $this->http = Framework\App\ObjectManager::getInstance()->create(
+        $this->http = $this->objectManager->create(
             Server::class,
             [
                 'host' => '0.0.0.0',
@@ -153,8 +165,14 @@ class GraphQl implements AppInterface
 
     private function reset()
     {
-        $factory = Framework\App\Bootstrap::createObjectManagerFactory($this->data['baseDir'], $_SERVER);
-        Framework\App\ObjectManager::setInstance($factory->create($_SERVER));
+        $factory = Framework\App\Bootstrap::createObjectManagerFactory(BP, $this->data['initParams']);
+        Framework\App\ObjectManager::setInstance($factory->create($this->data['initParams']));
+        $this->objectManager = Framework\App\ObjectManager::getInstance();
+        $this->appState = $this->objectManager->get(State::class);
+        $this->configLoader = $this->objectManager->get(ConfigLoaderInterface::class);
+        $this->schemaGenerator = $this->objectManager->get(SchemaGeneratorInterface::class);
+        $this->init();
+        $this->graphQl = $this->objectManager->get(Conttroller::class);
         $this->http->reload();
     }
 
@@ -163,15 +181,11 @@ class GraphQl implements AppInterface
      * @return Http
      */
     private function makeMagentoRequest(Request $request): Http {
-        $httpRequest = Framework\App\ObjectManager::getInstance()->create(Http::class);
+        $httpRequest = $this->objectManager->create(Http::class);
         $httpRequest->setPathInfo($request->server['path_info']);
         $httpRequest->setHeaders(\Zend\Http\Headers::fromString('')->addHeaders($request->header));
         $httpRequest->setContent($request->rawContent());
-        $httpRequest->setServer(
-            Framework\App\ObjectManager::getInstance()->create(
-            \Zend\Stdlib\Parameters::class, $request->server
-            )
-        );
+        $httpRequest->setServer($this->objectManager->create(\Zend\Stdlib\Parameters::class, $request->server));
         return $httpRequest;
     }
 
