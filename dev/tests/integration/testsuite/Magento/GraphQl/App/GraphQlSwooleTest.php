@@ -31,6 +31,12 @@ class GraphQlSwooleTest extends \PHPUnit\Framework\TestCase
     public static function setUpBeforeClass()
     {
         self::$process = self::startEntryPoint();
+        do {
+            sleep(5);
+        } while (
+            self::$process->isRunning()
+            && (!self::$process->getOutput() || self::$process->getOutput() !== 'GraphQl is running')
+        );
         parent::setUpBeforeClass();
     }
 
@@ -68,8 +74,7 @@ class GraphQlSwooleTest extends \PHPUnit\Framework\TestCase
         $process = Bootstrap::getObjectManager()->create(
             Process::class, ['commandline' => [PHP_BINARY,  'bin/graphql']]
         );
-//        $process = $this->objectManager->create(Process::class, ['commandline' => [PHP_BINARY,  'bin/graphql']]);
-        $process->setTimeout(10000000);
+        $process->setTimeout(60);
         $process->setEnv($_ENV + get_defined_constants(true)['user']);
         $process->start(function($type, $data) use ($process) {
             if (!$process->isSuccessful()) {

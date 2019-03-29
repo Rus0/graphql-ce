@@ -63,7 +63,7 @@ class Config implements ConfigInterface
     }
 
     /**
-     * @inheritdocadd
+     * @inheritdoc
      */
     public function getDeclaredTypes() : array
     {

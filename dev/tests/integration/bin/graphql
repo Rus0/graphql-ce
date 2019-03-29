@@ -13,6 +13,6 @@ $p = $testBootstrap->getAppInitParams();
 $d = $testBootstrap->getAppTempDir();
 $bootstrap = \Magento\Framework\App\Bootstrap::create($d, $p);
 /** @var \Magento\GraphQl\App\GraphQl $app */
-$app = $bootstrap->createApplication(\Magento\GraphQl\App\GraphQl::class);
+$app = $bootstrap->createApplication(\Magento\GraphQl\App\GraphQl::class, ['data' => ['baseDir' => $d]]);
 $bootstrap->run($app);
 $app->listen();

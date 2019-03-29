@@ -11,6 +11,7 @@ use Magento\Framework\App\Area;
 use Magento\Framework\App\Console\Response as CliResponse;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\GraphQl\Schema\SchemaGeneratorInterface;
+use Magento\Framework as Framework;
 use Magento\GraphQl\Controller\GraphQl\Proxy as Conttroller;
 use Magento\MessageQueue\Api\PoisonPillCompareInterface;
 use Magento\MessageQueue\Api\PoisonPillReadInterface;
@@ -34,11 +35,6 @@ class GraphQl implements AppInterface
      * @var SchemaGeneratorInterface
      */
     private $schemaGenerator;
-
-    /**
-     * @var ObjectManagerInterface
-     */
-    private $objectManager;
 
     /**
      * @var State
@@ -65,8 +61,17 @@ class GraphQl implements AppInterface
     private $poisonPillVersion;
 
     /**
+     * @var Server
+     */
+    private $http;
+
+    /**
+     * @var array
+     */
+    private $data;
+
+    /**
      * GraphQl constructor.
-     * @param ObjectManagerInterface $objectManager
      * @param State $appState
      * @param Conttroller $graphQl
      * @param SchemaGeneratorInterface $schemaGenerator
@@ -74,48 +79,48 @@ class GraphQl implements AppInterface
      * @param CliResponse $cliResponse
      * @param PoisonPillReadInterface $poisonPillRead
      * @param PoisonPillCompareInterface $poisonPillCompare
+     * @param array $data
      */
     public function __construct(
-        ObjectManagerInterface $objectManager,
         State $appState,
         Conttroller $graphQl,
         SchemaGeneratorInterface $schemaGenerator,
         ConfigLoaderInterface $configLoader,
         CliResponse $cliResponse,
         PoisonPillReadInterface $poisonPillRead,
-        PoisonPillCompareInterface $poisonPillCompare
+        PoisonPillCompareInterface $poisonPillCompare,
+        $data = []
     )
     {
         $this->graphQl = $graphQl;
         $this->schemaGenerator = $schemaGenerator;
-        $this->objectManager = $objectManager;
         $this->appState = $appState;
         $this->configLoader = $configLoader;
         $this->cliResponse = $cliResponse;
         $this->poisonPillRead = $poisonPillRead;
         $this->poisonPillCompare = $poisonPillCompare;
-    }
-
-    private function setState():void
-    {
-        $this->appState->setAreaCode(Area::AREA_GRAPHQL);
-        $this->objectManager->configure($this->configLoader->load(Area::AREA_GRAPHQL));
+        $this->data = $data;
     }
 
     public function launch()
     {
-        $this->setState();
-        $this->schemaGenerator->generate();
+        $this->init();
         $this->cliResponse->setCode(0);
         $this->cliResponse->terminateOnSend(false);
         return $this->cliResponse;
     }
 
+    private function init():void
+    {
+        $this->appState->setAreaCode(Area::AREA_GRAPHQL);
+        Framework\App\ObjectManager::getInstance()->configure($this->configLoader->load(Area::AREA_GRAPHQL));
+        $this->schemaGenerator->generate();
+    }
+
     public function listen():void
     {
         //TODO: need extend config
-        /** @var Server $http */
-        $http = $this->objectManager->create(
+        $this->http = Framework\App\ObjectManager::getInstance()->create(
             Server::class,
             [
                 'host' => '0.0.0.0',
@@ -124,25 +129,33 @@ class GraphQl implements AppInterface
                 'sock_type' => SWOOLE_SOCK_TCP
             ]
         );
-        $http->set([
+        $this->http->set([
             'worker_num' => 8,
             'max_request' => 10000,
             'buffer_output_size' => 32 * 1024 * 1024,
         ]);
         $this->poisonPillVersion = $this->poisonPillRead->getLatestVersion();
-        $http->on('request', [$this, 'request']);
-        $http->start();
+        $this->http->on('request', [$this, 'request']);
+        echo 'GraphQl is running';
+        $this->http->start();
     }
 
     public function request(Request $request, Response $response)
     {
         if (false === $this->poisonPillCompare->isLatestVersion($this->poisonPillVersion)) {
-            exit(0);
+            $this->reset();
         }
         $httpRequest = $this->makeMagentoRequest($request);
-        /** @var \Magento\Framework\Webapi\Response $result */
+        /** @var Framework\Webapi\Response $result */
         $result = $this->graphQl->dispatch($httpRequest);
         $response->end($result->getContent());
+    }
+
+    private function reset()
+    {
+        $factory = Framework\App\Bootstrap::createObjectManagerFactory($this->data['baseDir'], $_SERVER);
+        Framework\App\ObjectManager::setInstance($factory->create($_SERVER));
+        $this->http->reload();
     }
 
     /**
@@ -150,11 +163,15 @@ class GraphQl implements AppInterface
      * @return Http
      */
     private function makeMagentoRequest(Request $request): Http {
-        $httpRequest = $this->objectManager->create(Http::class);
+        $httpRequest = Framework\App\ObjectManager::getInstance()->create(Http::class);
         $httpRequest->setPathInfo($request->server['path_info']);
         $httpRequest->setHeaders(\Zend\Http\Headers::fromString('')->addHeaders($request->header));
         $httpRequest->setContent($request->rawContent());
-        $httpRequest->setServer($this->objectManager->create(\Zend\Stdlib\Parameters::class, $request->server));
+        $httpRequest->setServer(
+            Framework\App\ObjectManager::getInstance()->create(
+            \Zend\Stdlib\Parameters::class, $request->server
+            )
+        );
         return $httpRequest;
     }
 
