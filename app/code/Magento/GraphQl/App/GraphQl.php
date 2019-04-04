@@ -131,7 +131,7 @@ class GraphQl implements AppInterface
 
     public function listen():void
     {
-        //TODO: need extend config
+        //TODO: need external config
         $this->http = $this->objectManager->create(
             Server::class,
             [
@@ -154,13 +154,18 @@ class GraphQl implements AppInterface
 
     public function request(Request $request, Response $response)
     {
-        if (false === $this->poisonPillCompare->isLatestVersion($this->poisonPillVersion)) {
-            $this->reset();
+        try {
+            if (false === $this->poisonPillCompare->isLatestVersion($this->poisonPillVersion)) {
+                $this->reset();
+            }
+            $httpRequest = $this->makeMagentoRequest($request);
+            /** @var Framework\Webapi\Response $result */
+            $result = $this->graphQl->dispatch($httpRequest);
+            $response->end($result->getContent());
+        } catch (\Exception $e) {
+            //TODO: better error report
+            $response->end('Error');
         }
-        $httpRequest = $this->makeMagentoRequest($request);
-        /** @var Framework\Webapi\Response $result */
-        $result = $this->graphQl->dispatch($httpRequest);
-        $response->end($result->getContent());
     }
 
     private function reset()
@@ -171,6 +176,7 @@ class GraphQl implements AppInterface
         $this->appState = $this->objectManager->get(State::class);
         $this->configLoader = $this->objectManager->get(ConfigLoaderInterface::class);
         $this->schemaGenerator = $this->objectManager->get(SchemaGeneratorInterface::class);
+        $this->poisonPillVersion = $this->poisonPillRead->getLatestVersion();
         $this->init();
         $this->graphQl = $this->objectManager->get(Conttroller::class);
         $this->http->reload();

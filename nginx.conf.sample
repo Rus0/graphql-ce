@@ -165,6 +165,13 @@ location /errors/ {
     }
 }
 
+location /graphql {
+    proxy_http_version 1.1;
+    proxy_set_header Connection "keep-alive";
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_pass http://proxy_graphql;
+}
+
 # PHP entry point for main application
 location ~ ^/(index|get|static|errors/report|errors/404|errors/503|health_check)\.php$ {
     try_files $uri =404;

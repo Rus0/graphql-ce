@@ -83,4 +83,13 @@ class ObjectManager implements \Magento\Framework\ObjectManagerInterface
     {
         $this->_config->extend($configuration);
     }
+
+    public function reset()
+    {
+        foreach($this->_sharedInstances as $instance) {
+            if ($instance instanceof ResetCacheInterface) {
+                $instance->reset();
+            }
+        }
+    }
 }
