@@ -329,7 +329,9 @@ class AttributePersistor
         $this->processDeletes($entityType, $context);
         $this->processInserts($entityType, $context);
         $this->processUpdates($entityType, $context);
-        unset($this->delete, $this->insert, $this->update);
+        $this->delete = [];
+        $this->insert = [];
+        $this->update = [];
     }
 
     /**
