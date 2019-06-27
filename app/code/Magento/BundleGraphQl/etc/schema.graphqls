@@ -7,7 +7,7 @@ type Mutation {
 
 input AddBundleProductsToCartInput {
     cart_id: String!
-    cartItems: [BundleProductCartItemInput!]!
+    cart_items: [BundleProductCartItemInput!]!
 }
 
 input BundleProductCartItemInput {
